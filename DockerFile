@@ -1,0 +1,15 @@
+FROM php:8.3-fpm
+WORKDIR /var/www/html
+RUN apt-get update && apt-get install -y \
+    git \
+    zip \
+    unzip \
+    libzip-dev \
+    libicu-dev \
+    libpq-dev \
+    && docker-php-ext-configure zip --with-libzip \
+    && docker-php-ext-install -j$(nproc) intl zip pdo_pgsql opcache
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+RUN chown -R www-data:www-data /var/www/html
+EXPOSE 9000
+CMD ["php-fpm"]
