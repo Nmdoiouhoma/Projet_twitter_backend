@@ -1,0 +1,27 @@
+services:
+  app:
+    build: .
+    container_name: twitter_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - database
+    environment:
+      DATABASE_URL: "postgresql://user:password@database:5432/twitter_db?serverVersion=16&charset=utf8"
+
+  database:
+    image: postgres:16-alpine
+    container_name: twitter_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: twitter_db
+    ports:
+      - "62138:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
