@@ -1,13 +1,8 @@
-# config/routes.yaml (ou un fichier API dédié)
+api_controllers:
+    resource: ../src/Controller/
+    type: attribute
+    prefix: /api
 
-# ... vos routes existantes ...
-
-# Route pour le login (déjà présente)
-api_login_check:
-    path: /api/login
-    methods: POST
-
-# Route pour rafraîchir le token (fournie par le bundle, mais bonne pratique de l'avoir ici pour la config)
-api_token_refresh:
-    path: /api/token/refresh
-    methods: POST
+other_controllers:
+    resource: ../src/Controller/
+    type: attribute
