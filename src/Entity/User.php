@@ -15,6 +15,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')] 
+#[ORM\HasLifecycleCallbacks]
 #[UniqueEntity('email')] 
 #[UniqueEntity('userName')] 
 class User implements UserInterface, PasswordAuthenticatedUserInterface
@@ -50,19 +51,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255, unique: true)]
     private ?string $userName = null;
 
+    #[ORM\OneToMany(mappedBy: 'author', targetEntity: Tweet::class, orphanRemoval: true)]
+    private Collection $tweets;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $updatedAt = null;
 
-    // Un User peut avoir plusieurs NewsItems (tweets)
-    // 'author' dans NewsItem est le ManyToOne inversé
     #[ORM\OneToMany(targetEntity: NewsItem::class, mappedBy: 'author', cascade: ['remove'])] 
     private Collection $newsItems;
 
-    // Un User peut avoir émis plusieurs Likes (un Like est fait PAR un User)
-    // 'user' dans Like est le ManyToOne inversé
     #[ORM\OneToMany(targetEntity: Like::class, mappedBy: 'user', cascade: ['remove'])] 
     private Collection $givenLikes;
 
@@ -84,6 +84,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->givenLikes = new ArrayCollection();
         $this->follows = new ArrayCollection();
         $this->following = new ArrayCollection();
+        $this->tweets = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -99,10 +100,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    // --- Symfony Security UserInterface methods ---
-
-    // Cette méthode est requise par UserInterface et Doctrine pour identifier l'utilisateur.
-    // Elle ne doit pas être redéfinie par un setId si l'ID est auto-généré.
     public function getId(): ?int
     {
         return $this->id;
@@ -115,8 +112,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function eraseCredentials(): void
     {
-        // Efface les informations sensibles, comme le mot de passe brut s'il était stocké
-        // $this->password = null;
+       
     }
 
     public function getEmail(): ?string
@@ -204,7 +200,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->updatedAt;
     }
 
-    // --- NewsItems (Tweets) owned by this User ---
     /**
      * @return Collection<int, NewsItem>
      */
@@ -225,7 +220,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeNewsItem(NewsItem $newsItem): static
     {
         if ($this->newsItems->removeElement($newsItem)) {
-            // set the owning side to null (unless already changed)
             if ($newsItem->getAuthor() === $this) {
                 $newsItem->setAuthor(null);
             }
@@ -233,7 +227,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    // --- Likes given by this User ---
     /**
      * @return Collection<int, Like>
      */
@@ -282,7 +275,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeFollow(Follow $follow): static
     {
         if ($this->follows->removeElement($follow)) {
-            // set the owning side to null (unless already changed)
             if ($follow->getFollower() === $this) {
                 $follow->setFollower(null);
             }
@@ -312,12 +304,25 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeFollowing(Follow $following): static
     {
         if ($this->following->removeElement($following)) {
-            // set the owning side to null (unless already changed)
             if ($following->getFollowing() === $this) {
                 $following->setFollowing(null);
             }
         }
 
+        return $this;
+    }
+
+    public function getTweets(): Collection
+    {
+        return $this->tweets;
+    }
+
+    public function addTweet(Tweet $tweet): static
+    {
+        if (!$this->tweets->contains($tweet)) {
+            $this->tweets->add($tweet);
+            $tweet->setAuthor($this);
+        }
         return $this;
     }
 }
