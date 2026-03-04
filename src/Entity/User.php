@@ -60,9 +60,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?\DateTimeImmutable $updatedAt = null;
 
-    #[ORM\OneToMany(targetEntity: NewsItem::class, mappedBy: 'author', cascade: ['remove'])] 
-    private Collection $newsItems;
-
     #[ORM\OneToMany(targetEntity: Like::class, mappedBy: 'user', cascade: ['remove'])] 
     private Collection $givenLikes;
 
@@ -86,7 +83,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function __construct()
     {
-        $this->newsItems = new ArrayCollection();
         $this->givenLikes = new ArrayCollection();
         $this->follows = new ArrayCollection();
         $this->following = new ArrayCollection();
@@ -204,33 +200,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->updatedAt;
-    }
-
-    /**
-     * @return Collection<int, NewsItem>
-     */
-    public function getNewsItems(): Collection
-    {
-        return $this->newsItems;
-    }
-
-    public function addNewsItem(NewsItem $newsItem): static
-    {
-        if (!$this->newsItems->contains($newsItem)) {
-            $this->newsItems->add($newsItem);
-            $newsItem->setAuthor($this);
-        }
-        return $this;
-    }
-
-    public function removeNewsItem(NewsItem $newsItem): static
-    {
-        if ($this->newsItems->removeElement($newsItem)) {
-            if ($newsItem->getAuthor() === $this) {
-                $newsItem->setAuthor(null);
-            }
-        }
-        return $this;
     }
 
     /**
