@@ -78,6 +78,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: Follow::class, mappedBy: 'following')]
     private Collection $following; 
 
+    #[ORM\Column(type: 'integer')]
+    private int $countFollowers = 0;
+
+    #[ORM\Column(type: 'integer')]
+    private int $countFollowing = 0;
+
     public function __construct()
     {
         $this->newsItems = new ArrayCollection();
@@ -107,7 +113,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getUserIdentifier(): string
     {
-        return (string) $this->email;
+        return (string) $this->userName;
     }
 
     public function eraseCredentials(): void
@@ -324,5 +330,39 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $tweet->setAuthor($this);
         }
         return $this;
+    }
+
+    public function getCountFollowers(): int
+    {
+        return $this->countFollowers;
+    }
+
+    public function incrementCountFollowers(): void
+    {
+        $this->countFollowers++;
+    }
+
+    public function decrementCountFollowers(): void
+    {
+        if ($this->countFollowers > 0) {
+            $this->countFollowers--;
+        }
+    }
+
+    public function getCountFollowing(): int
+    {
+        return $this->countFollowing;
+    }
+
+    public function incrementCountFollowing(): void
+    {
+        $this->countFollowing++;
+    }
+
+    public function decrementCountFollowing(): void
+    {
+        if ($this->countFollowing > 0) {
+            $this->countFollowing--;
+        }
     }
 }

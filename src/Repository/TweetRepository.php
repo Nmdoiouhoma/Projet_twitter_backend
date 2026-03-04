@@ -40,4 +40,24 @@ class TweetRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
+
+    public function save(Tweet $entity, bool $flush = true): void
+    {
+        $em = $this->getEntityManager();
+        $em->persist($entity);
+
+        if ($flush) {
+            $em->flush();
+        }
+    }
+
+    public function remove(Tweet $entity, bool $flush = true): void
+    {
+        $em = $this->getEntityManager();
+        $em->remove($entity);
+
+        if ($flush) {
+            $em->flush();
+        }
+    }
 }

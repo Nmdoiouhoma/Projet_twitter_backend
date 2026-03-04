@@ -40,4 +40,25 @@ class FollowRepository extends ServiceEntityRepository
 //            ->getOneOrNullResult()
 //        ;
 //    }
+
+
+    public function save(Follow $entity, bool $flush = true): void
+    {
+        $em = $this->getEntityManager();
+        $em->persist($entity);
+
+        if ($flush) {
+            $em->flush();
+        }
+    }
+
+    public function remove(Follow $entity, bool $flush = true): void
+    {
+        $em = $this->getEntityManager();
+        $em->remove($entity);
+
+        if ($flush) {
+            $em->flush();
+        }
+    }
 }

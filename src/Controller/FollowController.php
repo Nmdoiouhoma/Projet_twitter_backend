@@ -2,28 +2,34 @@
 
 namespace App\Controller;
 
+use App\Entity\Follow;
 use App\Entity\User;
 use App\Repository\FollowRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class FollowController extends AbstractController
 {
-   #[Route('/follow/user/{id}', name: 'app_follow', methods: ['POST'])]
-   public function followUser(User $userToFollow): JsonResponse
-   {
-       $currentUser = $this->getUser();
+    #[Route('/api/follow/user/{id}', name: 'app_follow', methods: ['POST'])]
+    public function followUser(
+        User $userToFollow,
+        FollowRepository $followUserRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse
+    {
+        $currentUser = $this->getUser();
 
-       if (!$currentUser) {
-           return $this->json(['error' => 'Unauthorized'], 401);
-       }
+        if (!$currentUser) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
 
-       if ($currentUser === $userToFollow) {
+        if ($currentUser === $userToFollow) {
            return $this->json(['error' => 'Cannot follow yourself'], 400);
        }
 
-       $existingFollow = $this->followUserRepository->findOneBy([
+       $existingFollow = $followUserRepository->findOneBy([
            'follower' => $currentUser,
            'following' => $userToFollow
        ]);
@@ -36,24 +42,37 @@ final class FollowController extends AbstractController
          $follow->setFollower($currentUser);
          $follow->setFollowing($userToFollow);
 
-         $this->followUserRepository->save($follow);
+         $currentUser->incrementCountFollowing();
+         $userToFollow->incrementCountFollowers();
 
-         return $this->json(['message' => 'User followed successfully', 'username' => $userToFollow->getUsername(),
-         'followersCount' => count($userToFollow->getFollowers())]);
-   }
+         $entityManager->persist($follow);
+         $entityManager->persist($currentUser);
+         $entityManager->persist($userToFollow);
+         $entityManager->flush();
 
-   #[Route('/unfollow', name: 'app_unfollow', methods: ['DELETE'])]
-   public function unfollowUser(): JsonResponse
-   {
-       $currentUser = $this->getUser();
+         return $this->json([
+             'message' => 'User followed successfully',
+             'username' => $userToFollow->getUserName(),
+             'followersCount' => $userToFollow->getCountFollowers(),
+             'userId' => $userToFollow->getId(),
+             'followingCount' => $currentUser->getCountFollowing(),
+         ]);
+    }
+
+    #[Route('/api/unfollow/user/{id}', name: 'app_unfollow', methods: ['DELETE'])]
+    public function unfollowUser(
+        User $userToUnfollow,
+        FollowRepository $followUserRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse
+    {
+        $currentUser = $this->getUser();
 
        if (!$currentUser) {
            return $this->json(['error' => 'Unauthorized'], 401);
        }
 
-       $userToUnfollow = $this->getUser(); // Get the user to unfollow (you might want to change this logic)
-
-       $existingFollow = $this->followUserRepository->findOneBy([
+       $existingFollow = $followUserRepository->findOneBy([
            'follower' => $currentUser,
            'following' => $userToUnfollow
        ]);
@@ -62,16 +81,27 @@ final class FollowController extends AbstractController
            return $this->json(['error' => 'Not following this user'], 400);
        }
 
-       $this->followUserRepository->remove($existingFollow);
+       // met à jour les compteurs sur les deux utilisateurs
+       $currentUser->decrementCountFollowing();
+       $userToUnfollow->decrementCountFollowers();
 
-       return $this->json(['message' => 'User unfollowed successfully', 'username' => $userToUnfollow->getUsername(),
-           'followersCount' => count($userToUnfollow->getFollowers())]);
+       $entityManager->remove($existingFollow);
+       $entityManager->persist($currentUser);
+       $entityManager->persist($userToUnfollow);
+       $entityManager->flush();
+
+       return $this->json([
+           'message' => 'User unfollowed successfully',
+           'username' => $userToUnfollow->getUserName(),
+           'followersCount' => $userToUnfollow->getCountFollowers(),
+           'followingCount' => $currentUser->getCountFollowing(),
+       ]);
    }
 
-   #[Route('user/{id}/{following}', name: 'user_following', methods: ['GET'])]
-   public function getFollowing(User $user): JsonResponse
-   {
-        $following = $this->followRepository->findBy(['follower' => $user]);
+    #[Route('/api/users/{id}/following', name: 'user_following', methods: ['GET'])]
+    public function getFollowing(User $user, FollowRepository $followRepository): JsonResponse
+    {
+        $following = $followRepository->findBy(['follower' => $user]);
 
         $data = array_map(function (Follow $follow) {
             return [
@@ -84,10 +114,10 @@ final class FollowController extends AbstractController
         return $this->json($data);
     }
 
-    #[Route('/users/{id}/followers', name: 'user_followers', methods: ['GET'])]
-    public function getFollowers(User $user): JsonResponse
+    #[Route('/api/users/{id}/followers', name: 'user_followers', methods: ['GET'])]
+    public function getFollowers(User $user, FollowRepository $followRepository): JsonResponse
     {
-        $followers = $this->followRepository->findBy(['following' => $user]);
+        $followers = $followRepository->findBy(['following' => $user]);
 
         $data = array_map(function (Follow $follow) {
             return [
