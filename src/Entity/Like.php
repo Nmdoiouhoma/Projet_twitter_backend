@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Repository\LikeRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Doctrine\Common\Collections\Collection;
 
 #[ORM\Entity(repositoryClass: LikeRepository::class)]
 #[ORM\Table(name: 'likes')] 
@@ -18,9 +19,9 @@ class Like
     #[ORM\JoinColumn(nullable: false)] 
     private ?User $user = null;
 
-    #[ORM\ManyToOne(inversedBy: 'likes')] 
-    #[ORM\JoinColumn(nullable: false)] 
-    private ?NewsItem $newsItem = null;
+    #[ORM\ManyToOne(inversedBy: 'likes')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?Tweet $tweet = null;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $likedAt = null;
@@ -47,14 +48,14 @@ class Like
         return $this;
     }
 
-    public function getNewsItem(): ?NewsItem
+    public function getTweet(): ?Tweet
     {
-        return $this->newsItem;
+        return $this->tweet;
     }
 
-    public function setNewsItem(?NewsItem $newsItem): static
+    public function setTweet(?Tweet $tweet): static
     {
-        $this->newsItem = $newsItem;
+        $this->tweet = $tweet;
         return $this;
     }
 
