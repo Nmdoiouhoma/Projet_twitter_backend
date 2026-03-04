@@ -20,12 +20,22 @@ final class TweetController extends AbstractController
     #[Route('/api/tweets', name: 'tweet_index', methods: ['GET'])]
     public function index(TweetRepository $tweetRepository): JsonResponse
     {
+        $user = $this->getUser();
+
         $tweets = $tweetRepository->findBy([], ['createdAt' => 'DESC']);
+
+        if ($user instanceof User) {
+            $tweets = array_filter(
+                $tweets,
+                fn (Tweet $tweet) => $tweet->getAuthor() !== $user
+            );
+        }
 
         $data = array_map(function (Tweet $tweet) {
             return [
                 'id' => $tweet->getId(),
                 'content' => $tweet->getContent(),
+                'imageUrl' => $tweet->getImageUrl(),
                 'author' => [
                     'id' => $tweet->getAuthor()->getId(),
                     'username' => $tweet->getAuthor()->getUserName(),
@@ -38,6 +48,44 @@ final class TweetController extends AbstractController
         }, $tweets);
 
         return $this->json($data);
+    }
+
+     #[Route('/api/upload', name: 'api_upload', methods: ['POST'])]
+    public function upload(Request $request): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        /** @var UploadedFile|null $file */
+        $file = $request->files->get('file');
+        if (!$file) {
+            return $this->json(['error' => 'No file provided'], 400);
+        }
+
+        if (!str_starts_with($file->getMimeType() ?? '', 'image/')) {
+            return $this->json(['error' => 'Invalid file type'], 400);
+        }
+        $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads';
+
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0775, true);
+        }
+
+        $newFilename = uniqid('tweet_', true) . '.' . $file->guessExtension();
+
+        try {
+            $file->move($uploadDir, $newFilename);
+        } catch (\Throwable $e) {
+            return $this->json(['error' => 'Failed to move file'], 500);
+        }
+        $publicUrl = sprintf(
+            'http://127.0.0.1:8000/uploads/%s',
+            $newFilename
+        );
+
+        return $this->json(['url' => $publicUrl], 201);
     }
 
     #[Route('/api/tweets', name: 'tweet_create', methods: ['POST'])]
@@ -65,12 +113,16 @@ final class TweetController extends AbstractController
         $tweet->setContent($content);
         $tweet->setAuthor($user);
 
+        $imageUrl = isset($data['imageUrl']) ? trim((string) $data['imageUrl']) : null;
+        $tweet->setImageUrl($imageUrl !== '' ? $imageUrl : null);
+
         $entityManager->persist($tweet);
         $entityManager->flush();
 
         return $this->json([
             'id' => $tweet->getId(),
             'content' => $tweet->getContent(),
+            'imageUrl' => $tweet->getImageUrl(),
             'author' => [
                 'id' => $tweet->getAuthor()->getId(),
                 'username' => $tweet->getAuthor()->getUserName(),
@@ -88,6 +140,7 @@ final class TweetController extends AbstractController
         return $this->json([
             'id' => $tweet->getId(),
             'content' => $tweet->getContent(),
+            'imageUrl' => $tweet->getImageUrl(),
             'author' => [
                 'id' => $tweet->getAuthor()->getId(),
                 'username' => $tweet->getAuthor()->getUserName(),
@@ -126,11 +179,18 @@ final class TweetController extends AbstractController
         }
 
         $tweet->setContent($content);
+
+        if (array_key_exists('imageUrl', $data)) {
+            $imageUrl = trim((string) $data['imageUrl']);
+            $tweet->setImageUrl($imageUrl !== '' ? $imageUrl : null);
+        }
+
         $entityManager->flush();
 
         return $this->json([
             'id' => $tweet->getId(),
             'content' => $tweet->getContent(),
+            'imageUrl' => $tweet->getImageUrl(),
             'author' => [
                 'id' => $tweet->getAuthor()->getId(),
                 'username' => $tweet->getAuthor()->getUserName(),
@@ -233,43 +293,50 @@ final class TweetController extends AbstractController
     }
 
     #[Route('/api/feed', name: 'tweet_feed', methods: ['GET'])]
-public function feed(
-    TweetRepository $tweetRepository,
-    FollowRepository $followRepository
-): JsonResponse {
-    $user = $this->getUser();
-    if (!$user instanceof User) {
-        return $this->json(['error' => 'Unauthorized'], 401);
+    public function feed(
+        TweetRepository $tweetRepository,
+        FollowRepository $followRepository
+    ): JsonResponse {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        // Récupérer les utilisateurs suivis
+        $follows = $followRepository->findBy(['follower' => $user]);
+        $followingUsers = array_map(fn(Follow $f) => $f->getFollowing(), $follows);
+
+        if (empty($followingUsers)) {
+            return $this->json([]);
+        }
+
+        // Récupérer leurs tweets
+        $tweets = $tweetRepository->findBy(
+            ['author' => $followingUsers],
+            ['createdAt' => 'DESC']
+        );
+
+        // Exclure les propres tweets de l'utilisateur au cas où il se suivrait
+        $tweets = array_filter(
+            $tweets,
+            fn (Tweet $tweet) => $tweet->getAuthor() !== $user
+        );
+
+        $data = array_map(function (Tweet $tweet) {
+            return [
+                'id' => $tweet->getId(),
+                'content' => $tweet->getContent(),
+                'imageUrl' => $tweet->getImageUrl(),
+                'author' => [
+                    'id' => $tweet->getAuthor()->getId(),
+                    'username' => $tweet->getAuthor()->getUserName(),
+                ],
+                'likeCount' => $tweet->getLikeCount(),
+                'createdAt' => $tweet->getCreatedAt()?->format('Y-m-d H:i:s'),
+            ];
+        }, $tweets);
+
+        return $this->json($data);
     }
-
-    // Récupérer les utilisateurs suivis
-    $follows = $followRepository->findBy(['follower' => $user]);
-    $followingUsers = array_map(fn(Follow $f) => $f->getFollowing(), $follows);
-
-    if (empty($followingUsers)) {
-        return $this->json([]);
-    }
-
-    // Récupérer leurs tweets
-    $tweets = $tweetRepository->findBy(
-        ['author' => $followingUsers],
-        ['createdAt' => 'DESC']
-    );
-
-    $data = array_map(function (Tweet $tweet) {
-        return [
-            'id' => $tweet->getId(),
-            'content' => $tweet->getContent(),
-            'author' => [
-                'id' => $tweet->getAuthor()->getId(),
-                'username' => $tweet->getAuthor()->getUserName(),
-            ],
-            'likeCount' => $tweet->getLikeCount(),
-            'createdAt' => $tweet->getCreatedAt()?->format('Y-m-d H:i:s'),
-        ];
-    }, $tweets);
-
-    return $this->json($data);
-}
 }
 
