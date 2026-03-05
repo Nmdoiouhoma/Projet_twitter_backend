@@ -6,6 +6,7 @@ use App\Entity\Like;
 use App\Entity\Tweet;
 use App\Entity\User;
 use App\Entity\Follow;
+use App\Entity\Notification;
 use App\Repository\FollowRepository;
 use App\Repository\LikeRepository;
 use App\Repository\TweetRepository;
@@ -237,25 +238,33 @@ final class TweetController extends AbstractController
     }
 
     #[Route('/api/tweets/{id}', name: 'tweet_delete', methods: ['DELETE'])]
-    public function delete(
-        Tweet $tweet,
-        EntityManagerInterface $entityManager
-    ): JsonResponse {
-        $user = $this->getUser();
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Unauthorized'], 401);
-        }
-
-        if ($tweet->getAuthor() !== $user) {
-            return $this->json(['error' => 'You can only delete your own tweets'], 403);
-        }
-
-        $entityManager->remove($tweet);
-        $entityManager->flush();
-
-        return $this->json(null, 204);
+public function delete(
+    Tweet $tweet,
+    EntityManagerInterface $entityManager
+): JsonResponse {
+    $user = $this->getUser();
+    if (!$user instanceof User) {
+        return $this->json(['error' => 'Unauthorized'], 401);
     }
 
+    if ($tweet->getAuthor() !== $user) {
+        return $this->json(['error' => 'You can only delete your own tweets'], 403);
+    }
+
+    // Supprimer d'abord tous les likes associés
+    foreach ($tweet->getLikes() as $like) {
+        $entityManager->remove($like);
+    }
+
+    // Puis supprimer le tweet
+    $entityManager->remove($tweet);
+    $entityManager->flush();
+
+    return $this->json([
+        'message' => 'Tweet deleted successfully',
+        'tweetId' => $tweet->getId(),
+    ]);
+}
     #[Route('/api/tweets/{id}/like', name: 'tweet_like', methods: ['POST'])]
     public function like(
         Tweet $tweet,
@@ -266,26 +275,36 @@ final class TweetController extends AbstractController
         if (!$user instanceof User) {
             return $this->json(['error' => 'Unauthorized'], 401);
         }
-
+    
         $existingLike = $likeRepository->findOneBy([
             'user' => $user,
             'tweet' => $tweet,
         ]);
-
+    
         if ($existingLike) {
             return $this->json(['error' => 'Already liked'], 400);
         }
-
+    
         $like = new Like();
         $like->setUser($user);
         $like->setTweet($tweet);
-
+    
         $tweet->addLike($like);
-
+    
+        // Notification de like pour l'auteur du tweet
+        $notification = new Notification();
+        $notification->setType('like');
+        $notification->setUser($tweet->getAuthor());    
+        $notification->setLiker($user);                   
+        $notification->setTweet($tweet);
+        $notification->setIsRead(false);
+        $notification->setCreatedAt(new \DateTimeImmutable());
+    
+        $entityManager->persist($notification);
         $entityManager->persist($like);
         $entityManager->persist($tweet);
         $entityManager->flush();
-
+    
         return $this->json([
             'message' => 'Tweet liked successfully',
             'tweetId' => $tweet->getId(),
