@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Follow;
 use App\Entity\User;
+use App\Entity\Notification;
 use App\Repository\FollowRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -13,51 +14,59 @@ use Symfony\Component\Routing\Attribute\Route;
 final class FollowController extends AbstractController
 {
     #[Route('/api/follow/user/{id}', name: 'app_follow', methods: ['POST'])]
-    public function followUser(
-        User $userToFollow,
-        FollowRepository $followUserRepository,
-        EntityManagerInterface $entityManager
-    ): JsonResponse
-    {
-        $currentUser = $this->getUser();
+public function followUser(
+    User $userToFollow,
+    FollowRepository $followUserRepository,
+    EntityManagerInterface $entityManager
+): JsonResponse {
+    $currentUser = $this->getUser();
 
-        if (!$currentUser) {
-            return $this->json(['error' => 'Unauthorized'], 401);
-        }
-
-        if ($currentUser === $userToFollow) {
-           return $this->json(['error' => 'Cannot follow yourself'], 400);
-       }
-
-       $existingFollow = $followUserRepository->findOneBy([
-           'follower' => $currentUser,
-           'following' => $userToFollow
-       ]);
-
-         if ($existingFollow) {
-              return $this->json(['error' => 'Already following this user'], 400);
-         }
-
-         $follow = new Follow();
-         $follow->setFollower($currentUser);
-         $follow->setFollowing($userToFollow);
-
-         $currentUser->incrementCountFollowing();
-         $userToFollow->incrementCountFollowers();
-
-         $entityManager->persist($follow);
-         $entityManager->persist($currentUser);
-         $entityManager->persist($userToFollow);
-         $entityManager->flush();
-
-         return $this->json([
-             'message' => 'User followed successfully',
-             'username' => $userToFollow->getUserName(),
-             'followersCount' => $userToFollow->getCountFollowers(),
-             'userId' => $userToFollow->getId(),
-             'followingCount' => $currentUser->getCountFollowing(),
-         ]);
+    if (!$currentUser instanceof User) {
+        return $this->json(['error' => 'Unauthorized'], 401);
     }
+
+    if ($currentUser === $userToFollow) {
+        return $this->json(['error' => 'Cannot follow yourself'], 400);
+    }
+
+    $existingFollow = $followUserRepository->findOneBy([
+        'follower' => $currentUser,
+        'following' => $userToFollow,
+    ]);
+
+    if ($existingFollow) {
+        return $this->json(['error' => 'Already following this user'], 400);
+    }
+
+    $follow = new Follow();
+    $follow->setFollower($currentUser);
+    $follow->setFollowing($userToFollow);
+
+    $currentUser->incrementCountFollowing();
+    $userToFollow->incrementCountFollowers();
+
+    // Notification "follow"
+    $notification = new Notification();
+    $notification->setType('follow');
+    $notification->setUser($userToFollow);                
+    $notification->setFollower($currentUser);            
+    $notification->setIsRead(false);
+    $notification->setCreatedAt(new \DateTimeImmutable());
+
+    $entityManager->persist($notification);
+    $entityManager->persist($follow);
+    $entityManager->persist($currentUser);
+    $entityManager->persist($userToFollow);
+    $entityManager->flush();
+
+    return $this->json([
+        'message' => 'User followed successfully',
+        'username' => $userToFollow->getUserName(),
+        'followersCount' => $userToFollow->getCountFollowers(),
+        'userId' => $userToFollow->getId(),
+        'followingCount' => $currentUser->getCountFollowing(),
+    ]);
+}
 
     #[Route('/api/unfollow/user/{id}', name: 'app_unfollow', methods: ['DELETE'])]
     public function unfollowUser(
