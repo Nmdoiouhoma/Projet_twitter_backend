@@ -35,6 +35,7 @@ final class ProfileController extends AbstractController
                         'id' => $tweet->getId(),
                         'content' => $tweet->getContent(),
                         'createdAt' => $tweet->getCreatedAt()?->format('Y-m-d H:i:s'),
+                        'imageUrl' => $tweet->getImageUrl(),
                         'likesCount' => count($tweet->getLikes()),
                     ];
                 }, $user->getTweets()->toArray()),
