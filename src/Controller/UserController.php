@@ -19,7 +19,7 @@ final class UserController extends AbstractController
         $userData = array_map(function(User $user) {
             return [
                 'id' => $user->getId(),
-                'username' => $user->getUsername(),
+                'userName' => $user->getUserName(),
                 'lastname' => $user->getLastname(),
                 'firstname' => $user->getFirstname()
             ];
@@ -47,7 +47,7 @@ final class UserController extends AbstractController
             'success' => true,
             'data' => [
                 'id' => $user->getId(),
-                'username' => $user->getUsername(),
+                'userName' => $user->getUserName(),
             ]
         ]);
     }
@@ -77,11 +77,22 @@ final class UserController extends AbstractController
             }
         }
         
-        $user->setUsername($data['username'] ?? $user->getUsername());
-        $user->setPassword($data['password'] ?? $user->getPassword());
-        $user->setLastname($data['lastname'] ?? $user->getLastname());
-        $user->setFirstname($data['firstname'] ?? $user->getFirstname());
-        $user->setEmail($data['email'] ?? $user->getEmail());
+        // Mettre à jour les champs simples (on ignore le mot de passe ici pour éviter de le dé-hasher)
+        if (isset($data['userName'])) {
+            $user->setUserName($data['userName']);
+        }
+        if (isset($data['lastname'])) {
+            $user->setLastname($data['lastname']);
+        }
+        if (isset($data['firstname'])) {
+            $user->setFirstname($data['firstname']);
+        }
+        if (isset($data['email'])) {
+            $user->setEmail($data['email']);
+        }
+        if (isset($data['profileImageUrl'])) {
+            $user->setImageUrl($data['profileImageUrl']);
+        }
 
         $userRepository->save($user, true);
 
@@ -90,7 +101,7 @@ final class UserController extends AbstractController
             'message' => 'User updated successfully',
             'data' => [
                 'id' => $user->getId(),
-                'username' => $user->getUsername(),
+                'userName' => $user->getUserName(),
             ]
         ]);
     }
@@ -119,7 +130,7 @@ final class UserController extends AbstractController
             'success' => true,
             'data' => [
                 'id' => $user->getId(),
-                'username' => $user->getUsername(),
+                'userName' => $user->getUserName(),
             ],
             'message' => 'User deleted successfully'
         ]);
@@ -142,7 +153,7 @@ final class UserController extends AbstractController
         'success' => true,
         'message' => 'User logged out successfully',
         'data' => [
-            'username' => $currentUser->getUsername()
+            'userName' => $currentUser->getUserName()
         ]
     ]);
 }

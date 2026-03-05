@@ -25,10 +25,11 @@ final class ProfileController extends AbstractController
             'success' => true,
             'data' => [
                 'id' => $user->getId(),
-                'username' => $user->getUsername(),
+                'username' => $user->getUserName(),
                 'firstname' => $user->getFirstname(),
                 'lastname' => $user->getLastname(),
                 'email' => $user->getEmail(),
+                'profileImageUrl' => $user->getImageUrl(),
                 'createdAt' => $user->getCreatedAt()?->format('Y-m-d H:i:s'),
                 'tweets' => array_map(function($tweet) {
                     return [

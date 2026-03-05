@@ -30,6 +30,7 @@ final class RegisterController extends AbstractController
         $lastname = $data['lastname'] ?? null;
         $username = $data ['userName'] ?? null;
         $password = $data['password'] ?? null;
+        $profileImageUrl = isset($data['profileImageUrl']) ? trim((string) $data['profileImageUrl']) : null;
 
         if (!$email || !$password) {
             return $this->json(['error' => 'Email and password required'], 400);
@@ -42,6 +43,8 @@ final class RegisterController extends AbstractController
         $user->setLastname($lastname);
         $user->setUserName($username);
         $user->setPassword($passwordHasher->hashPassword($user, $password));
+        // The User entity stores the profile image URL in `imageUrl`
+        $user->setImageUrl($profileImageUrl !== '' ? $profileImageUrl : null);
         
         $errors = $validator->validate($user);
         if (count($errors) > 0) {
