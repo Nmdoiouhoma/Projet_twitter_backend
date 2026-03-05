@@ -46,7 +46,9 @@ final class LoginController extends AbstractController
                 'email' => $user->getEmail(),
                 'firstname' => $user->getFirstname(),
                 'lastname' => $user->getLastname(),
-                'userName' => $user->getUserName()
+                'userName' => $user->getUserName(),
+                // Keep key name aligned with register payload; stored in entity as `imageUrl`
+                'profileImageUrl' => $user->getImageUrl(),
             ]
         ], 200);
     }

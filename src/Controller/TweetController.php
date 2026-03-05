@@ -50,7 +50,41 @@ final class TweetController extends AbstractController
         return $this->json($data);
     }
 
-     #[Route('/api/upload', name: 'api_upload', methods: ['POST'])]
+    #[Route('/upload', name: 'api_upload_public', methods: ['POST'])]
+    public function uploadPublic(Request $request): JsonResponse
+    {
+        
+        /** @var UploadedFile|null $file */
+        $file = $request->files->get('file');
+        if (!$file) {
+            return $this->json(['error' => 'No file provided'], 400);
+        }
+
+        if (!str_starts_with($file->getMimeType() ?? '', 'image/')) {
+            return $this->json(['error' => 'Invalid file type'], 400);
+        }
+        $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads';
+
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0775, true);
+        }
+
+        $newFilename = uniqid('tweet_', true) . '.' . $file->guessExtension();
+
+        try {
+            $file->move($uploadDir, $newFilename);
+        } catch (\Throwable $e) {
+            return $this->json(['error' => 'Failed to move file'], 500);
+        }
+        $publicUrl = sprintf(
+            'http://127.0.0.1:8000/uploads/%s',
+            $newFilename
+        );
+
+        return $this->json(['url' => $publicUrl], 201);
+    }
+
+    #[Route('/api/upload', name: 'api_upload', methods: ['POST'])]
     public function upload(Request $request): JsonResponse
     {
         $user = $this->getUser();
