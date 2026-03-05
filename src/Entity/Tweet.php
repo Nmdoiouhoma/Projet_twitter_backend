@@ -23,6 +23,9 @@ class Tweet
     #[ORM\Column(length: 280)] 
     private ?string $content = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $imageUrl = null;
+
     #[ORM\Column(options: ['default' => 0])] 
     private int $likeCount = 0;
 
@@ -142,6 +145,18 @@ class Tweet
     public function updateLikeCountFromCollection(): void
     {
         $this->likeCount = $this->likes->count();
+    }
+
+    public function getImageUrl(): ?string
+    {
+        return $this->imageUrl;
+    }
+
+    public function setImageUrl(?string $imageUrl): static
+    {
+        $this->imageUrl = $imageUrl;
+
+        return $this;
     }
 
     public function getRetweetsCount(): int
